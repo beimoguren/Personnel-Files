@@ -1,0 +1,3346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>员工档案统计看板</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #165dff;
+      --primary-soft: rgba(22, 93, 255, .08);
+      --success: #00b42a;
+      --warning: #ff7d00;
+      --danger: #f53f3f;
+      --purple: #722ed1;
+      --cyan: #14c9c9;
+      --amber: #f7ba1e;
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-soft: #f7f9fc;
+      --border: #e5e8ef;
+      --text: #1d2129;
+      --text-sub: #4e5969;
+      --text-muted: #86909c;
+      --shadow: 0 8px 24px rgba(29, 33, 41, .06);
+      --radius: 8px;
+    }
+
+    [data-theme="dark"] {
+      --bg: #101215;
+      --surface: #191c20;
+      --surface-soft: #20242a;
+      --border: #30343b;
+      --text: #f2f3f5;
+      --text-sub: #c9cdd4;
+      --text-muted: #858b95;
+      --shadow: 0 8px 24px rgba(0, 0, 0, .25);
+      --primary-soft: rgba(22, 93, 255, .18);
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 14px;
+    }
+
+    body.archive-open {
+      overflow: hidden;
+    }
+
+    .page {
+      width: min(1760px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 20px 0 32px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #165dff, #14c9c9);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 700;
+      letter-spacing: 0;
+      flex: 0 0 auto;
+    }
+
+    h1 {
+      font-size: 22px;
+      line-height: 1.25;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 4px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .edit-actions {
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    body.dashboard-editing .edit-actions {
+      display: inline-flex;
+    }
+
+    body.dashboard-editing #editBoardBtn {
+      display: none;
+    }
+
+    .sync-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text-sub);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .sync-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 0 4px rgba(0, 180, 42, .12);
+    }
+
+    button, select, input {
+      font: inherit;
+    }
+
+    .icon-btn,
+    .text-btn {
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-sub);
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .icon-btn {
+      width: 34px;
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+    }
+
+    .text-btn {
+      padding: 0 14px;
+      color: #fff;
+      border-color: var(--primary);
+      background: var(--primary);
+      font-weight: 600;
+    }
+
+    .icon-btn:hover,
+    .text-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow);
+    }
+
+    .filter-panel {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(132px, 1fr)) auto auto;
+      gap: 10px;
+      align-items: end;
+      padding: 14px;
+      margin-bottom: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .field {
+      min-width: 0;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .field select,
+    .field input {
+      width: 100%;
+      height: 34px;
+      padding: 0 10px;
+      color: var(--text);
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      outline: none;
+    }
+
+    .field select:focus,
+    .field input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+
+    .reset-btn {
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      color: var(--text-sub);
+      background: var(--surface-soft);
+      cursor: pointer;
+    }
+
+    .edit-hint {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: -4px 0 16px;
+      padding: 10px 12px;
+      border: 1px dashed rgba(22, 93, 255, .55);
+      border-radius: 8px;
+      color: var(--primary);
+      background: var(--primary-soft);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    body.dashboard-editing .edit-hint {
+      display: flex;
+    }
+
+    .dashboard-canvas {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+      align-items: stretch;
+    }
+
+    .dashboard-canvas > [data-dashboard-module] {
+      min-width: 0;
+      margin-bottom: 0;
+    }
+
+    .dashboard-card-item {
+      height: 100%;
+    }
+
+    [data-module-size="kpi"] { grid-column: span 2; }
+    [data-module-size="identity"] { grid-column: span 3; }
+    [data-module-size="wide"] { grid-column: span 8; }
+    [data-module-size="side"] { grid-column: span 4; }
+    [data-module-size="normal"] { grid-column: span 4; }
+    [data-module-size="half"] { grid-column: span 6; }
+    [data-module-size="full"] { grid-column: 1 / -1; }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    [data-dashboard-module] {
+      position: relative;
+    }
+
+    body.dashboard-editing [data-dashboard-module] {
+      outline: 1px dashed rgba(22, 93, 255, .58);
+      outline-offset: 3px;
+      cursor: grab;
+      transition: transform .16s ease, outline-color .16s ease, background .16s ease;
+    }
+
+    body.dashboard-editing [data-dashboard-module]:active {
+      cursor: grabbing;
+    }
+
+    [data-dashboard-module].dragging {
+      opacity: .58;
+      transform: scale(.996);
+    }
+
+    [data-dashboard-module].drag-over {
+      outline-color: var(--warning);
+      background: rgba(22, 93, 255, .04);
+    }
+
+    .module-drag-handle {
+      display: none;
+      position: absolute;
+      z-index: 5;
+      top: -12px;
+      left: 12px;
+      height: 24px;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      border-radius: 7px;
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      font-size: 12px;
+      font-weight: 720;
+      user-select: none;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    body.dashboard-editing .module-drag-handle {
+      display: inline-flex;
+    }
+
+    .kpi {
+      position: relative;
+      overflow: hidden;
+      min-height: 142px;
+      padding: 16px;
+    }
+
+    .kpi::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: var(--tone);
+    }
+
+    .kpi-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .kpi-label {
+      color: var(--text-muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .kpi-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: var(--tone);
+      background: color-mix(in srgb, var(--tone) 12%, transparent);
+      font-size: 16px;
+    }
+
+    .kpi-value {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin-bottom: 10px;
+      font-size: 32px;
+      line-height: 1;
+      font-weight: 750;
+      letter-spacing: 0;
+    }
+
+    .kpi-unit {
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .kpi-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .trend {
+      display: inline-flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 7px;
+      border-radius: 6px;
+      font-weight: 650;
+    }
+
+    .trend.up { color: var(--success); background: rgba(0, 180, 42, .1); }
+    .trend.down { color: var(--danger); background: rgba(245, 63, 63, .1); }
+    .trend.warn { color: var(--warning); background: rgba(255, 125, 0, .12); }
+    .trend.flat { color: var(--text-muted); background: rgba(134, 144, 156, .12); }
+
+    .drill-link {
+      cursor: pointer;
+      border-radius: 6px;
+      outline: 0;
+      transition: color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease;
+    }
+
+    .drill-link:hover,
+    .drill-link:focus-visible {
+      color: var(--primary);
+      background: var(--primary-soft);
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+
+    .drill-link:active {
+      transform: scale(.98);
+    }
+
+    .identity-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .identity-card {
+      min-height: 112px;
+      padding: 18px 20px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--identity-tone) 8%, var(--surface)), var(--surface));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .identity-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-sub);
+      font-weight: 650;
+      margin-bottom: 12px;
+    }
+
+    .identity-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: var(--identity-tone);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .identity-value {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin-bottom: 10px;
+      color: var(--text);
+      font-size: 32px;
+      line-height: 1;
+      font-weight: 760;
+    }
+
+    .identity-value span {
+      color: var(--text-sub);
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .identity-share {
+      color: var(--text-sub);
+      font-size: 13px;
+    }
+
+    .identity-share strong {
+      color: var(--text);
+      font-size: 18px;
+      font-weight: 720;
+    }
+
+    .movement-panel {
+      display: grid;
+      gap: 12px;
+      padding: 0 14px 14px;
+    }
+
+    .movement-summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .movement-stat {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-soft);
+      transition: .18s ease;
+    }
+
+    .movement-stat:hover,
+    .movement-stat:focus-visible {
+      transform: translateY(-1px);
+      border-color: color-mix(in srgb, var(--stat-tone) 52%, var(--border));
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--stat-tone) 12%, transparent);
+    }
+
+    .movement-stat span {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .movement-stat strong {
+      display: flex;
+      align-items: baseline;
+      gap: 3px;
+      color: var(--stat-tone);
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .movement-stat em {
+      color: var(--text-muted);
+      font-style: normal;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .movement-chart {
+      height: 214px;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.25fr .75fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .sub-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .sub-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 16px 0;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 650;
+      color: var(--text);
+    }
+
+    .card-desc {
+      margin-top: 4px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .segmented {
+      display: inline-flex;
+      padding: 2px;
+      border-radius: 8px;
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+      gap: 2px;
+    }
+
+    .segmented button {
+      height: 26px;
+      min-width: 52px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-sub);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .segmented button.active {
+      color: #fff;
+      background: var(--primary);
+    }
+
+    .chart {
+      height: 330px;
+      padding: 8px 12px 12px;
+    }
+
+    .chart.tall {
+      height: 398px;
+    }
+
+    .gender-panel {
+      height: 330px;
+      padding: 16px 20px 22px;
+      display: grid;
+      align-content: center;
+      gap: 22px;
+    }
+
+    .gender-figures {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: center;
+      text-align: center;
+    }
+
+    .gender-icon {
+      width: 76px;
+      height: 76px;
+      margin: 0 auto 10px;
+      border-radius: 24px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 34px;
+      font-weight: 760;
+    }
+
+    .gender-icon.male {
+      background: linear-gradient(135deg, #165dff, #2d6bea);
+    }
+
+    .gender-icon.female {
+      background: linear-gradient(135deg, #9f68e8, #c184ff);
+    }
+
+    .gender-count {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 4px;
+      color: var(--text);
+      font-size: 40px;
+      line-height: 1;
+      font-weight: 780;
+    }
+
+    .gender-count span {
+      color: var(--text-sub);
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .gender-label {
+      margin-top: 8px;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 650;
+    }
+
+    .gender-ratio {
+      display: grid;
+      grid-template-columns: 70.86fr 29.14fr;
+      height: 28px;
+      overflow: hidden;
+      border-radius: 0;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 650;
+      text-align: center;
+      line-height: 28px;
+      background: var(--surface-soft);
+    }
+
+    .gender-ratio .male {
+      background: #165dff;
+    }
+
+    .gender-ratio .female {
+      background: #b477ec;
+    }
+
+    .risk-list {
+      padding: 12px 16px 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .risk-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 8px;
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+    }
+
+    .risk-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 750;
+    }
+
+    .risk-item h3 {
+      font-size: 13px;
+      margin-bottom: 3px;
+      font-weight: 650;
+    }
+
+    .risk-item p {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .risk-number {
+      font-size: 20px;
+      font-weight: 750;
+    }
+
+    .table-card {
+      overflow: hidden;
+    }
+
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-meta {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .drill-hint {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .drill-hint.show {
+      display: flex;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1120px;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--text-muted);
+      background: var(--surface-soft);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    td {
+      color: var(--text-sub);
+      font-size: 13px;
+    }
+
+    tbody tr:hover {
+      background: var(--primary-soft);
+    }
+
+    .employee {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 12px;
+      background: linear-gradient(135deg, #165dff, #722ed1);
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .tag.formal { color: var(--success); background: rgba(0, 180, 42, .1); }
+    .tag.trial { color: var(--warning); background: rgba(255, 125, 0, .12); }
+    .tag.leave { color: var(--text-muted); background: rgba(134, 144, 156, .12); }
+    .tag.risk { color: var(--danger); background: rgba(245, 63, 63, .1); }
+    .tag.blue { color: var(--primary); background: var(--primary-soft); }
+
+    .pager {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px 16px 16px;
+    }
+
+    .pager button {
+      min-width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-sub);
+      cursor: pointer;
+    }
+
+    .pager button.active {
+      color: #fff;
+      border-color: var(--primary);
+      background: var(--primary);
+    }
+
+    .drawer-mask {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: none;
+      background: rgba(16, 18, 21, .36);
+      backdrop-filter: blur(2px);
+    }
+
+    .drawer-mask.show {
+      display: block;
+    }
+
+    .employee-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      z-index: 41;
+      width: min(1360px, calc(100vw - 72px));
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      box-shadow: -16px 0 40px rgba(0, 0, 0, .16);
+      transform: translateX(104%);
+      transition: transform .24s ease;
+    }
+
+    .employee-drawer.show {
+      transform: translateX(0);
+    }
+
+    .drawer-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--surface-soft), var(--surface));
+    }
+
+    .drawer-profile {
+      display: flex;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .drawer-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 24px;
+      font-weight: 780;
+      background: linear-gradient(135deg, #165dff, #722ed1);
+      flex: 0 0 auto;
+    }
+
+    .drawer-name {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+      color: var(--text);
+      font-size: 20px;
+      font-weight: 760;
+    }
+
+    .drawer-sub {
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .drawer-close {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-sub);
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    .drawer-body {
+      padding: 18px 24px 24px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: var(--bg);
+    }
+
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .profile-stat {
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      border-left: 3px solid var(--border);
+    }
+
+    .profile-stat.stat-blue {
+      border-left-color: var(--primary);
+      background: linear-gradient(90deg, rgba(22, 93, 255, .08), var(--surface) 42%);
+    }
+
+    .profile-stat.stat-green {
+      border-left-color: var(--green);
+      background: linear-gradient(90deg, rgba(0, 180, 42, .08), var(--surface) 42%);
+    }
+
+    .profile-stat.stat-amber {
+      border-left-color: var(--orange);
+      background: linear-gradient(90deg, rgba(255, 125, 0, .10), var(--surface) 42%);
+    }
+
+    .profile-stat.stat-red {
+      border-left-color: var(--red);
+      background: linear-gradient(90deg, rgba(245, 63, 63, .10), var(--surface) 42%);
+    }
+
+    .profile-stat.stat-purple {
+      border-left-color: var(--purple);
+      background: linear-gradient(90deg, rgba(114, 46, 209, .08), var(--surface) 42%);
+    }
+
+    .profile-stat span {
+      display: block;
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .profile-stat strong {
+      color: var(--text);
+      font-size: 18px;
+      font-weight: 760;
+    }
+
+    .drawer-section {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .archive-layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 34%) 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .archive-timeline-section,
+    .archive-record-section {
+      grid-column: 1 / -1;
+    }
+
+    .archive-side,
+    .archive-main {
+      display: grid;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .archive-side {
+      grid-template-rows: auto 1fr;
+    }
+
+    .archive-side .drawer-section:last-child,
+    .archive-main .drawer-section {
+      height: 100%;
+    }
+
+    .archive-main .drawer-section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .archive-layout > *,
+    .drawer-section {
+      min-width: 0;
+    }
+
+    .drawer-section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 720;
+    }
+
+    .archive-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .archive-tag {
+      display: inline-flex;
+      align-items: center;
+      height: 26px;
+      padding: 0 10px;
+      border-radius: 7px;
+      color: var(--primary);
+      background: var(--primary-soft);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .archive-tag.tag-green { color: #008a1e; background: rgba(0, 180, 42, .12); }
+    .archive-tag.tag-amber { color: #b35b00; background: rgba(255, 125, 0, .14); }
+    .archive-tag.tag-red { color: #c72222; background: rgba(245, 63, 63, .12); }
+    .archive-tag.tag-purple { color: #5b21b6; background: rgba(114, 46, 209, .12); }
+    .archive-tag.tag-cyan { color: #067c7c; background: rgba(20, 201, 201, .13); }
+    .archive-tag.tag-gray { color: var(--text-sub); background: rgba(134, 144, 156, .13); }
+
+    .archive-risk-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .archive-side .archive-risk-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .archive-risk {
+      padding: 10px;
+      border-radius: 8px;
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+    }
+
+    .archive-risk.risk-green {
+      border-left-color: var(--green);
+      background: linear-gradient(90deg, rgba(0, 180, 42, .09), var(--surface-soft) 42%);
+    }
+
+    .archive-risk.risk-amber {
+      border-left-color: var(--orange);
+      background: linear-gradient(90deg, rgba(255, 125, 0, .12), var(--surface-soft) 42%);
+    }
+
+    .archive-risk.risk-red {
+      border-left-color: var(--red);
+      background: linear-gradient(90deg, rgba(245, 63, 63, .12), var(--surface-soft) 42%);
+    }
+
+    .archive-risk.risk-blue {
+      border-left-color: var(--primary);
+      background: linear-gradient(90deg, rgba(22, 93, 255, .09), var(--surface-soft) 42%);
+    }
+
+    .archive-risk b {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .archive-risk span {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .drawer-chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      flex: 1;
+      align-items: stretch;
+    }
+
+    .drawer-chart {
+      height: 100%;
+      min-height: 280px;
+      border-radius: 8px;
+      background: var(--surface-soft);
+    }
+
+    .perf-panel {
+      height: 100%;
+      min-height: 280px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 8px;
+      background: var(--surface-soft);
+    }
+
+    .perf-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .perf-stat {
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .perf-stat span {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    .perf-stat strong {
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1.15;
+    }
+
+    .perf-stat.rating-a strong { color: #008a1e; }
+    .perf-stat.rating-a-minus strong { color: #0b7a75; }
+    .perf-stat.rating-b-plus strong { color: #165dff; }
+    .perf-stat.rating-b strong { color: #b35b00; }
+    .perf-stat.rating-c strong { color: #c72222; }
+
+    .perf-chart {
+      min-height: 0;
+    }
+
+    .rating-counts {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .rating-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 7px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-sub);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .rating-a { color: #008a1e; background: rgba(0, 180, 42, .12); border-color: rgba(0, 180, 42, .25); }
+    .rating-a-minus { color: #0b7a75; background: rgba(20, 201, 201, .13); border-color: rgba(20, 201, 201, .28); }
+    .rating-b-plus { color: #165dff; background: rgba(22, 93, 255, .11); border-color: rgba(22, 93, 255, .24); }
+    .rating-b { color: #b35b00; background: rgba(255, 125, 0, .13); border-color: rgba(255, 125, 0, .28); }
+    .rating-c { color: #c72222; background: rgba(245, 63, 63, .12); border-color: rgba(245, 63, 63, .26); }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .timeline-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 520;
+    }
+
+    .timeline-controls button {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-sub);
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .timeline-controls button:hover {
+      color: var(--primary);
+      border-color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .timeline-scroll {
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-behavior: smooth;
+      scrollbar-width: none;
+      padding: 8px 0 16px;
+    }
+
+    .timeline-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .archive-timeline-section .timeline {
+      position: relative;
+      display: flex;
+      gap: 12px;
+      min-width: max-content;
+      padding-top: 16px;
+    }
+
+    .archive-timeline-section .timeline::before {
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 18px;
+      height: 2px;
+      background: linear-gradient(90deg, rgba(22, 93, 255, .16), rgba(20, 201, 201, .4));
+    }
+
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 86px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .archive-timeline-section .timeline-item {
+      display: block;
+      position: relative;
+      flex: 0 0 260px;
+      min-width: 0;
+      scroll-snap-align: end;
+      padding-top: 18px;
+    }
+
+    .archive-timeline-section .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 0 4px var(--primary-soft);
+      transform: translateX(-50%);
+    }
+
+    .archive-timeline-section .timeline-item.latest::before {
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(0, 180, 42, .14);
+    }
+
+    .timeline-date {
+      color: var(--text-muted);
+      font-size: 12px;
+      padding-top: 3px;
+    }
+
+    .archive-timeline-section .timeline-date {
+      margin-bottom: 6px;
+      padding-top: 0;
+      color: var(--primary);
+      font-weight: 720;
+      text-align: center;
+    }
+
+    .timeline-card {
+      position: relative;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+    }
+
+    .archive-timeline-section .timeline-card {
+      height: 100%;
+      min-height: 88px;
+      padding: 12px;
+      border-top: 3px solid var(--primary);
+      box-shadow: 0 6px 18px rgba(29, 33, 41, .05);
+    }
+
+    .archive-timeline-section .timeline-item.latest .timeline-card {
+      border-top-color: var(--green);
+      background: linear-gradient(180deg, rgba(0, 180, 42, .06), var(--surface-soft));
+    }
+
+    .timeline-card::before {
+      content: "";
+      position: absolute;
+      left: -19px;
+      top: 14px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    .archive-timeline-section .timeline-card::before {
+      display: none;
+    }
+
+    .timeline-card b {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .timeline-card span {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .archive-record-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .archive-record-table th {
+      padding: 9px 10px;
+      color: var(--text-muted);
+      background: var(--surface-soft);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 650;
+      text-align: left;
+    }
+
+    .archive-record-table td {
+      padding: 11px 10px;
+      color: var(--text-sub);
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      line-height: 1.45;
+      vertical-align: top;
+      word-break: break-word;
+    }
+
+    .archive-record-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .archive-record-type {
+      color: var(--text);
+      font-weight: 720;
+    }
+
+    .archive-record-title {
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .archive-record-meta {
+      display: block;
+      margin-top: 3px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .archive-record-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .archive-record-metric {
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color .18s ease, background .18s ease, transform .18s ease;
+    }
+
+    .archive-record-metric:hover,
+    .archive-record-metric.active {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .archive-record-metric:active {
+      transform: scale(.98);
+    }
+
+    .archive-record-metric strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--text);
+      font-size: 22px;
+      line-height: 1.1;
+    }
+
+    .archive-record-metric span {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .archive-record-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .archive-record-tab {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-sub);
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      transition: color .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    .archive-record-tab:hover,
+    .archive-record-tab.active {
+      color: var(--primary);
+      border-color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .empty-record {
+      padding: 22px;
+      border-radius: 8px;
+      background: var(--surface-soft);
+      color: var(--text-muted);
+      text-align: center;
+      font-size: 13px;
+    }
+
+    .archive-record-pager {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .archive-record-pager button {
+      min-width: 30px;
+      height: 28px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-sub);
+      cursor: pointer;
+    }
+
+    .archive-record-pager button:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+    }
+
+    .drawer-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+      justify-content: flex-end;
+    }
+
+    @media (max-width: 1280px) {
+      .filter-panel { grid-template-columns: repeat(3, minmax(140px, 1fr)); }
+      [data-module-size="kpi"] { grid-column: span 4; }
+      [data-module-size="identity"] { grid-column: span 6; }
+      [data-module-size="wide"],
+      [data-module-size="side"],
+      [data-module-size="normal"],
+      [data-module-size="half"] { grid-column: 1 / -1; }
+      .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .identity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .main-grid,
+      .sub-grid,
+      .sub-grid-2 { grid-template-columns: 1fr; }
+      .employee-drawer { width: min(1120px, calc(100vw - 48px)); }
+      .profile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .archive-layout { grid-template-columns: 1fr; }
+      .archive-side,
+      .archive-main { grid-template-rows: auto; }
+    }
+
+    @media (max-width: 760px) {
+      .page { width: min(100vw - 20px, 1760px); padding-top: 12px; }
+      .topbar,
+      .table-toolbar { align-items: flex-start; flex-direction: column; }
+      .filter-panel { grid-template-columns: 1fr; }
+      .dashboard-canvas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      [data-module-size="kpi"],
+      [data-module-size="identity"] { grid-column: span 1; }
+      [data-module-size="wide"],
+      [data-module-size="side"],
+      [data-module-size="normal"],
+      [data-module-size="half"],
+      [data-module-size="full"] { grid-column: 1 / -1; }
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .identity-grid { grid-template-columns: 1fr; gap: 10px; }
+      .kpi { min-height: 128px; padding: 14px; }
+      .kpi-value { font-size: 26px; }
+      .identity-value { font-size: 28px; }
+      .chart { height: 300px; }
+      .movement-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .employee-drawer { width: 100vw; }
+      .profile-grid,
+      .drawer-chart-grid,
+      .archive-risk-grid { grid-template-columns: 1fr; }
+      .archive-record-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .drawer-chart,
+      .perf-panel { min-height: 260px; }
+      .timeline-controls span { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="topbar">
+      <div class="title-wrap">
+        <div class="brand-mark">HR</div>
+        <div>
+          <h1>员工档案统计看板</h1>
+          <div class="subtitle">华彬数智工厂 · 人事行政 · 员工全生命周期档案分析</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="sync-state"><span class="sync-dot"></span><span id="syncText">数据更新 2026-06-13 09:30</span></div>
+        <button class="icon-btn" title="刷新数据" onclick="refreshDashboard()">↻</button>
+        <button class="icon-btn" title="切换主题" onclick="toggleTheme()">◐</button>
+        <button id="editBoardBtn" class="text-btn" onclick="enterDashboardEdit()">编辑看板</button>
+        <div class="edit-actions">
+          <button class="text-btn" onclick="saveDashboardLayout()">保存布局</button>
+          <button class="reset-btn" onclick="cancelDashboardEdit()">取消</button>
+          <button class="reset-btn" onclick="resetDashboardLayout()">恢复默认</button>
+        </div>
+        <button class="text-btn" onclick="exportNotice()">导出明细</button>
+      </div>
+    </section>
+
+    <section class="filter-panel">
+      <div class="field">
+        <label>所属基地</label>
+        <select id="orgFilter">
+          <option value="all">全部基地</option>
+          <option value="湖北生产基地">湖北生产基地</option>
+          <option value="广东生产基地">广东生产基地</option>
+          <option value="贵州生产基地">贵州生产基地</option>
+          <option value="福建生产基地">福建生产基地</option>
+          <option value="集团总部">集团总部</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>数智工厂部门</label>
+        <select id="deptFilter">
+          <option value="all">全部部门</option>
+          <option value="生产部">生产部</option>
+          <option value="品管部">品管部</option>
+          <option value="仓储部">仓储部</option>
+          <option value="设备部">设备部</option>
+          <option value="人事行政部">人事行政部</option>
+          <option value="安全环保部">安全环保部</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>员工状态</label>
+        <select id="statusFilter">
+          <option value="all">全部状态</option>
+          <option value="试用">试用</option>
+          <option value="正式">正式</option>
+          <option value="离职">离职</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>学历</label>
+        <select id="eduFilter">
+          <option value="all">全部学历</option>
+          <option value="硕士">硕士</option>
+          <option value="本科">本科</option>
+          <option value="大专">大专</option>
+          <option value="高中/中专">高中/中专</option>
+          <option value="初中及以下">初中及以下</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>统计月份</label>
+        <input id="monthFilter" type="month" value="2026-06">
+      </div>
+      <div class="field">
+        <label>员工关键词</label>
+        <input id="keywordFilter" type="text" placeholder="工号/姓名/岗位">
+      </div>
+      <button class="text-btn" onclick="applyFilters()">查询</button>
+      <button class="reset-btn" onclick="resetFilters()">重置</button>
+    </section>
+
+    <div id="editHint" class="edit-hint">
+      <span>编辑模式：拖动每张卡片左上角手柄调整看板阅读顺序，卡片仅支持移动，不支持删除。</span>
+      <span>保存后将记住个人布局</span>
+    </div>
+
+    <section class="kpi-grid" data-dashboard-module="kpi" data-module-title="核心指标">
+      <article class="card kpi" style="--tone:#165dff">
+        <div class="kpi-head"><span class="kpi-label">在职员工总数</span><span class="kpi-icon">人</span></div>
+        <div class="kpi-value drill-link" role="button" tabindex="0" onclick="drillToDetail('在职员工总数')" onkeydown="handleDrillKey(event, '在职员工总数')">1,486<span class="kpi-unit">人</span></div>
+        <div class="kpi-meta"><span class="trend up">+3.8%</span><span>较上月净增 54 人</span></div>
+      </article>
+      <article class="card kpi" style="--tone:#ff7d00">
+        <div class="kpi-head"><span class="kpi-label">试用期员工</span><span class="kpi-icon">试</span></div>
+        <div class="kpi-value drill-link" role="button" tabindex="0" onclick="drillToDetail('试用期员工')" onkeydown="handleDrillKey(event, '试用期员工')">126<span class="kpi-unit">人</span></div>
+        <div class="kpi-meta"><span class="trend warn">8.5%</span><span>占在职员工比例</span></div>
+      </article>
+      <article class="card kpi" style="--tone:#00b42a">
+        <div class="kpi-head"><span class="kpi-label">本月新入职</span><span class="kpi-icon">入</span></div>
+        <div class="kpi-value drill-link" role="button" tabindex="0" onclick="drillToDetail('本月新入职')" onkeydown="handleDrillKey(event, '本月新入职')">68<span class="kpi-unit">人</span></div>
+        <div class="kpi-meta"><span class="trend up">+11.5%</span><span>招聘补充稳定</span></div>
+      </article>
+      <article class="card kpi" style="--tone:#f53f3f">
+        <div class="kpi-head"><span class="kpi-label">本月离职率</span><span class="kpi-icon">离</span></div>
+        <div class="kpi-value drill-link" role="button" tabindex="0" onclick="drillToDetail('本月离职率')" onkeydown="handleDrillKey(event, '本月离职率')">2.6<span class="kpi-unit">%</span></div>
+        <div class="kpi-meta"><span class="trend down">-0.4%</span><span>较上月下降</span></div>
+      </article>
+      <article class="card kpi" style="--tone:#722ed1">
+        <div class="kpi-head"><span class="kpi-label">平均年龄</span><span class="kpi-icon">龄</span></div>
+        <div class="kpi-value drill-link" role="button" tabindex="0" onclick="drillToDetail('平均年龄')" onkeydown="handleDrillKey(event, '平均年龄')">32.1<span class="kpi-unit">岁</span></div>
+        <div class="kpi-meta"><span class="trend flat">稳定</span><span>主力年龄 26-40 岁</span></div>
+      </article>
+      <article class="card kpi" style="--tone:#14c9c9">
+        <div class="kpi-head"><span class="kpi-label">合同90天内到期</span><span class="kpi-icon">约</span></div>
+        <div class="kpi-value drill-link" role="button" tabindex="0" onclick="drillToDetail('合同90天内到期')" onkeydown="handleDrillKey(event, '合同90天内到期')">118<span class="kpi-unit">人</span></div>
+        <div class="kpi-meta"><span class="trend warn">需跟进</span><span>含30天内 31 人</span></div>
+      </article>
+    </section>
+
+    <section class="identity-grid" data-dashboard-module="identity" data-module-title="身份标签">
+      <article class="identity-card" style="--identity-tone:#f36b6b">
+        <div class="identity-head"><span class="identity-icon">党</span><span>党员人数</span></div>
+        <div class="identity-value drill-link" role="button" tabindex="0" onclick="drillToDetail('党员人数')" onkeydown="handleDrillKey(event, '党员人数')">33<span>人</span></div>
+        <div class="identity-share">占比: <strong>10.93</strong> %</div>
+      </article>
+      <article class="identity-card" style="--identity-tone:#5aaa63">
+        <div class="identity-head"><span class="identity-icon">军</span><span>退伍军人人数</span></div>
+        <div class="identity-value drill-link" role="button" tabindex="0" onclick="drillToDetail('退伍军人人数')" onkeydown="handleDrillKey(event, '退伍军人人数')">16<span>人</span></div>
+        <div class="identity-share">占比: <strong>5.30</strong> %</div>
+      </article>
+      <article class="identity-card" style="--identity-tone:#3aa0c8">
+        <div class="identity-head"><span class="identity-icon">会</span><span>工会委员人数</span></div>
+        <div class="identity-value drill-link" role="button" tabindex="0" onclick="drillToDetail('工会委员人数')" onkeydown="handleDrillKey(event, '工会委员人数')">16<span>人</span></div>
+        <div class="identity-share">占比: <strong>5.30</strong> %</div>
+      </article>
+      <article class="identity-card" style="--identity-tone:#63b090">
+        <div class="identity-head"><span class="identity-icon">代</span><span>职工代表人数</span></div>
+        <div class="identity-value drill-link" role="button" tabindex="0" onclick="drillToDetail('职工代表人数')" onkeydown="handleDrillKey(event, '职工代表人数')">39<span>人</span></div>
+        <div class="identity-share">占比: <strong>12.91</strong> %</div>
+      </article>
+    </section>
+
+    <section class="main-grid" data-dashboard-module="trend-risk" data-module-title="趋势与风险">
+      <article class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">入职/离职/转正趋势</div>
+            <div class="card-desc">按月观察人员流入、流出与试用转正节奏</div>
+          </div>
+          <div class="segmented">
+            <button class="active" onclick="switchTrend('month', this)">月度</button>
+            <button onclick="switchTrend('quarter', this)">季度</button>
+          </div>
+        </div>
+        <div id="trendChart" class="chart tall"></div>
+      </article>
+
+      <article class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">人事风险提醒</div>
+            <div class="card-desc">合同、试用、退休、多能工证书等待办</div>
+          </div>
+        </div>
+        <div class="risk-list">
+          <div class="risk-item">
+            <div class="risk-badge" style="background:#f53f3f">急</div>
+            <div><h3>合同30天内到期</h3><p>需优先确认续签、终止或转签安排</p></div>
+            <div class="risk-number drill-link" role="button" tabindex="0" onclick="drillToDetail('合同30天内到期')" onkeydown="handleDrillKey(event, '合同30天内到期')">31</div>
+          </div>
+          <div class="risk-item">
+            <div class="risk-badge" style="background:#ff7d00">试</div>
+            <div><h3>试用期15天内到期</h3><p>请推动转正评估及审批单据</p></div>
+            <div class="risk-number drill-link" role="button" tabindex="0" onclick="drillToDetail('试用期15天内到期')" onkeydown="handleDrillKey(event, '试用期15天内到期')">24</div>
+          </div>
+          <div class="risk-item">
+            <div class="risk-badge" style="background:#722ed1">才</div>
+            <div><h3>人才库认证待复核</h3><p>生效状态变更后需同步标签字段</p></div>
+            <div class="risk-number drill-link" role="button" tabindex="0" onclick="drillToDetail('人才库认证待复核')" onkeydown="handleDrillKey(event, '人才库认证待复核')">18</div>
+          </div>
+          <div class="risk-item">
+            <div class="risk-badge" style="background:#14c9c9">技</div>
+            <div><h3>多能工证书90天内到期</h3><p>影响岗位认证与技能矩阵口径</p></div>
+            <div class="risk-number drill-link" role="button" tabindex="0" onclick="drillToDetail('多能工证书90天内到期')" onkeydown="handleDrillKey(event, '多能工证书90天内到期')">46</div>
+          </div>
+          <div class="risk-item">
+            <div class="risk-badge" style="background:#86909c">退</div>
+            <div><h3>退休日期180天内到达</h3><p>对接退休管理模块自动生成单据</p></div>
+            <div class="risk-number drill-link" role="button" tabindex="0" onclick="drillToDetail('退休日期180天内到达')" onkeydown="handleDrillKey(event, '退休日期180天内到达')">9</div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="sub-grid" data-dashboard-module="structure-1" data-module-title="基础结构分析">
+      <article class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">员工状态分布</div>
+            <div class="card-desc">试用、正式、离职结构</div>
+          </div>
+        </div>
+        <div id="statusChart" class="chart"></div>
+      </article>
+
+      <article class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">部门入转调离统计</div>
+            <div class="card-desc">按部门统计入职、转正、异动、离职人员变化</div>
+          </div>
+        </div>
+        <div class="movement-panel">
+          <div class="movement-summary">
+            <div class="movement-stat drill-link" style="--stat-tone:#165dff" role="button" tabindex="0" onclick="drillToDetail('部门入职人员')" onkeydown="handleDrillKey(event, '部门入职人员')">
+              <span>入职</span>
+              <strong>68<em>人</em></strong>
+            </div>
+            <div class="movement-stat drill-link" style="--stat-tone:#00b42a" role="button" tabindex="0" onclick="drillToDetail('部门转正人员')" onkeydown="handleDrillKey(event, '部门转正人员')">
+              <span>转正</span>
+              <strong>55<em>人</em></strong>
+            </div>
+            <div class="movement-stat drill-link" style="--stat-tone:#722ed1" role="button" tabindex="0" onclick="drillToDetail('部门异动人员')" onkeydown="handleDrillKey(event, '部门异动人员')">
+              <span>异动</span>
+              <strong>39<em>人</em></strong>
+            </div>
+            <div class="movement-stat drill-link" style="--stat-tone:#f53f3f" role="button" tabindex="0" onclick="drillToDetail('部门离职人员')" onkeydown="handleDrillKey(event, '部门离职人员')">
+              <span>离职</span>
+              <strong>31<em>人</em></strong>
+            </div>
+          </div>
+          <div id="deptMovementChart" class="movement-chart"></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">学历结构</div>
+            <div class="card-desc">最高学历分布</div>
+          </div>
+        </div>
+        <div id="eduChart" class="chart"></div>
+      </article>
+    </section>
+
+    <section class="sub-grid" data-dashboard-module="structure-2" data-module-title="组织与人群结构">
+      <article class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">部门人员排行</div>
+            <div class="card-desc">按数智工厂部门统计</div>
+          </div>
+        </div>
+        <div id="deptChart" class="chart"></div>
+      </article>
+
+      <article class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">性别结构</div>
+            <div class="card-desc">按员工性别统计人数和占比</div>
+          </div>
+        </div>
+        <div class="gender-panel">
+          <div class="gender-figures">
+            <div class="drill-link" role="button" tabindex="0" onclick="drillToDetail('性别结构 - 男性')" onkeydown="handleDrillKey(event, '性别结构 - 男性')">
+              <div class="gender-icon male">男</div>
+              <div class="gender-count">214<span>人</span></div>
+              <div class="gender-label">男性</div>
+            </div>
+            <div class="drill-link" role="button" tabindex="0" onclick="drillToDetail('性别结构 - 女性')" onkeydown="handleDrillKey(event, '性别结构 - 女性')">
+              <div class="gender-icon female">女</div>
+              <div class="gender-count">88<span>人</span></div>
+              <div class="gender-label">女性</div>
+            </div>
+          </div>
+          <div class="gender-ratio">
+            <div class="male">70.86%</div>
+            <div class="female">29.14%</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">司龄结构</div>
+            <div class="card-desc">按入职年限分档统计人员稳定性</div>
+          </div>
+        </div>
+        <div id="serviceChart" class="chart"></div>
+      </article>
+    </section>
+
+    <section class="sub-grid-2" data-dashboard-module="age-tags" data-module-title="年龄与标签">
+      <article class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">年龄结构</div>
+            <div class="card-desc">按年龄段统计员工年龄梯队</div>
+          </div>
+        </div>
+        <div id="ageChart" class="chart"></div>
+      </article>
+
+      <article class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">关键标签人员统计</div>
+            <div class="card-desc">核心人员、内训师、多能工等标签</div>
+          </div>
+        </div>
+        <div id="tagChart" class="chart"></div>
+      </article>
+    </section>
+
+    <section class="card table-card" data-dashboard-module="detail-table" data-module-title="员工明细">
+      <div class="table-toolbar">
+        <div>
+          <div class="card-title">员工档案明细</div>
+          <div class="table-meta">展示字段来自员工档案主表、用工信息、合同信息及标签信息</div>
+          <div id="drillHint" class="drill-hint">当前下钻：全部员工档案</div>
+        </div>
+        <div class="sync-state"><span>共 1,486 条，当前展示 10 条</span></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>员工</th>
+              <th>工号</th>
+              <th>机构</th>
+              <th>部门</th>
+              <th>岗位</th>
+              <th>状态</th>
+              <th>入职日期</th>
+              <th>学历</th>
+              <th>司龄</th>
+              <th>关键标签</th>
+              <th>合同风险</th>
+            </tr>
+          </thead>
+          <tbody id="employeeRows"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button>‹</button>
+        <button class="active">1</button>
+        <button>2</button>
+        <button>3</button>
+        <button>...</button>
+        <button>149</button>
+        <button>›</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="drawerMask" class="drawer-mask" onclick="closeEmployeeArchive()"></div>
+  <aside id="employeeDrawer" class="employee-drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div class="drawer-profile">
+        <div id="drawerAvatar" class="drawer-avatar">黄</div>
+        <div>
+          <div class="drawer-name">
+            <span id="drawerName">黄昊懿</span>
+            <span id="drawerStatus" class="tag formal">正式</span>
+          </div>
+          <div id="drawerSub" class="drawer-sub">10040710 · 湖北生产基地 · 品管部 · 化验员</div>
+        </div>
+      </div>
+      <button class="drawer-close" onclick="closeEmployeeArchive()" title="关闭">×</button>
+    </div>
+    <div class="drawer-body">
+      <section class="profile-grid">
+        <div class="profile-stat"><span>入职日期</span><strong id="archiveHireDate">2026-03-17</strong></div>
+        <div class="profile-stat"><span>司龄</span><strong id="archiveService">0.2年</strong></div>
+        <div class="profile-stat"><span>学历</span><strong id="archiveEdu">本科</strong></div>
+        <div class="profile-stat"><span>合同风险</span><strong id="archiveRisk">90天以上</strong></div>
+        <div class="profile-stat"><span>直接主管</span><strong id="archiveManager">赵晶晶</strong></div>
+        <div class="profile-stat"><span>联系方式</span><strong id="archivePhone">138****6549</strong></div>
+      </section>
+
+      <div class="archive-layout">
+        <div class="archive-side">
+          <section class="drawer-section">
+            <div class="drawer-section-title">员工画像标签</div>
+            <div id="archiveTags" class="archive-tags"></div>
+          </section>
+
+          <section class="drawer-section">
+            <div class="drawer-section-title">HR关注事项</div>
+            <div class="archive-risk-grid">
+              <div class="archive-risk"><b id="archiveContractRisk">合同正常</b><span>结合合同到期、续签次数、附件完整度判断</span></div>
+              <div class="archive-risk"><b id="archiveTrialRisk">转正状态正常</b><span>试用期员工需关注转正评估和审批节点</span></div>
+              <div class="archive-risk"><b id="archiveCertRisk">认证有效</b><span>多能工、人才库、内训师等认证需关注有效期</span></div>
+            </div>
+          </section>
+        </div>
+
+        <div class="archive-main">
+          <section class="drawer-section">
+            <div class="drawer-section-title">能力与绩效趋势</div>
+            <div class="drawer-chart-grid">
+              <div id="archiveRadarChart" class="drawer-chart"></div>
+              <div class="perf-panel">
+                <div id="archivePerfSummary" class="perf-summary"></div>
+                <div id="archivePerfChart" class="perf-chart"></div>
+                <div id="archiveRatingCounts" class="rating-counts"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section class="drawer-section archive-timeline-section">
+          <div class="drawer-section-title">
+            <span>员工全生命周期轨迹</span>
+            <div class="timeline-controls">
+              <span>默认定位最新节点</span>
+              <button onclick="scrollArchiveTimeline(-1)" title="查看更早节点">‹</button>
+              <button onclick="scrollArchiveTimeline(1)" title="查看更新节点">›</button>
+            </div>
+          </div>
+          <div id="timelineScroll" class="timeline-scroll">
+            <div id="archiveTimeline" class="timeline"></div>
+          </div>
+        </section>
+
+        <section class="drawer-section archive-record-section">
+          <div class="drawer-section-title">关联档案记录</div>
+          <div id="archiveRecords"></div>
+        </section>
+      </div>
+
+      <div class="drawer-actions">
+        <button class="reset-btn" onclick="drillToDetail('员工档案明细 - ' + document.getElementById('drawerName').textContent)">定位明细</button>
+        <button class="text-btn" onclick="exportNotice()">导出个人档案</button>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+    var dark = false;
+    var charts = {};
+    var trendMode = "month";
+    var currentArchiveProfile = null;
+    var activeArchiveRecordType = "培训记录";
+    var activeArchiveRecordPage = 1;
+    var archiveRecordPageSize = 4;
+    var dashboardEditing = false;
+    var dashboardDragSource = null;
+    var dashboardSavedOrder = null;
+    var dashboardLayoutKey = "employeeDashboardCardLayoutV1";
+
+    var palette = {
+      blue: "#165dff",
+      green: "#00b42a",
+      orange: "#ff7d00",
+      red: "#f53f3f",
+      purple: "#722ed1",
+      cyan: "#14c9c9",
+      amber: "#f7ba1e",
+      gray: "#86909c"
+    };
+
+    var trendMonthly = {
+      x: ["2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06"],
+      hire: [42, 54, 47, 39, 52, 61, 36, 31, 55, 58, 61, 68],
+      leave: [16, 21, 19, 23, 18, 22, 14, 12, 25, 20, 19, 17],
+      confirm: [29, 34, 40, 38, 35, 42, 33, 28, 31, 44, 47, 52]
+    };
+
+    var trendQuarter = {
+      x: ["2025Q3", "2025Q4", "2026Q1", "2026Q2"],
+      hire: [143, 152, 122, 187],
+      leave: [56, 63, 51, 56],
+      confirm: [103, 115, 92, 143]
+    };
+
+    var statusData = [
+      { name: "正式", value: 1360, itemStyle: { color: palette.green } },
+      { name: "试用", value: 126, itemStyle: { color: palette.orange } },
+      { name: "离职", value: 82, itemStyle: { color: palette.gray } }
+    ];
+
+    var deptMovementData = [
+      { dept: "生产部", hire: 22, regular: 18, transfer: 12, leave: 11 },
+      { dept: "品管部", hire: 13, regular: 11, transfer: 8, leave: 6 },
+      { dept: "仓储部", hire: 10, regular: 8, transfer: 6, leave: 5 },
+      { dept: "设备部", hire: 9, regular: 7, transfer: 5, leave: 4 },
+      { dept: "人事行政部", hire: 5, regular: 4, transfer: 3, leave: 2 },
+      { dept: "安全环保部", hire: 4, regular: 3, transfer: 2, leave: 2 },
+      { dept: "供应链部", hire: 5, regular: 4, transfer: 3, leave: 1 }
+    ];
+
+    var deptData = [
+      ["生产部", 418],
+      ["品管部", 236],
+      ["仓储部", 198],
+      ["设备部", 173],
+      ["人事行政部", 92],
+      ["安全环保部", 68],
+      ["供应链部", 61],
+      ["财务部", 48]
+    ];
+
+    var eduData = [
+      { name: "本科", value: 566 },
+      { name: "大专", value: 431 },
+      { name: "高中/中专", value: 286 },
+      { name: "硕士", value: 92 },
+      { name: "初中及以下", value: 111 }
+    ];
+
+    var tagData = [
+      ["多能工", 156],
+      ["核心人员", 138],
+      ["关键岗位", 116],
+      ["储备人才", 88],
+      ["岗位师傅", 73],
+      ["内训师", 52],
+      ["优秀员工", 48],
+      ["职工代表", 39],
+      ["储备干部", 39],
+      ["党员", 33],
+      ["退伍军人", 16],
+      ["工会委员", 16]
+    ];
+
+    var archiveRecordTypes = ["培训记录", "合同记录", "调动记录", "奖惩记录", "绩效记录", "认证记录", "关联单据", "待办事项"];
+
+    var employees = [
+      ["黄昊懿", "10040710", "湖北生产基地", "品管部", "化验员", "正式", "2026-03-17", "本科", "0.2年", "关键岗位", "90天以上"],
+      ["李明辉", "10040689", "湖北生产基地", "生产部", "灌装操作工", "试用", "2026-04-22", "大专", "0.1年", "多能工", "90天以上"],
+      ["王思琪", "10040725", "广东生产基地", "品管部", "检验员", "正式", "2024-09-15", "本科", "1.7年", "内训师", "60天内"],
+      ["张伟东", "10040512", "贵州生产基地", "设备部", "维修工", "正式", "2022-06-01", "中专", "4.0年", "岗位师傅", "90天以上"],
+      ["陈晓红", "10040801", "集团总部", "人事行政部", "HR专员", "正式", "2023-03-15", "本科", "3.2年", "储备人才", "90天内"],
+      ["刘建国", "10040398", "福建生产基地", "生产部", "班组长", "正式", "2019-01-10", "大专", "7.4年", "核心人员", "90天以上"],
+      ["赵丽娜", "10040922", "湖北生产基地", "供应链部", "采购员", "试用", "2026-05-06", "本科", "0.1年", "储备干部", "90天以上"],
+      ["孙志强", "10040456", "广东生产基地", "仓储部", "仓管员", "正式", "2021-08-20", "高中", "4.8年", "多能工", "30天内"],
+      ["周美玲", "10040673", "集团总部", "人事行政部", "招聘专员", "正式", "2024-02-28", "硕士", "2.3年", "优秀员工", "90天以上"],
+      ["吴大伟", "10040234", "贵州生产基地", "安全环保部", "安全员", "正式", "2020-11-05", "大专", "5.6年", "关键岗位", "90天以上"]
+    ];
+
+    var archiveProfiles = {
+      "10040710": {
+        age: 26,
+        gender: "男",
+        phone: "138****6549",
+        manager: "赵晶晶",
+        political: "党员",
+        tags: ["关键岗位", "党员", "岗位培养", "品管序列"],
+        capability: [88, 82, 76, 91, 84],
+        performance: [86, 88, 90, 89, 92, 91],
+        performanceYear: [84, 85, 86, 88, 87, 89, 90, 88, 91, 89, 92, 91],
+        timeline: [
+          ["2026-03-17", "入职建档", "招聘信息同步至员工档案，生成工号 10040710"],
+          ["2026-03-20", "合同签订", "签订三年期限劳动合同，合同状态为生效中"],
+          ["2026-04-08", "岗位培训", "完成品管基础操作、安全规范和检验记录培训"],
+          ["2026-04-22", "团队活动", "参与品管部质量改善共创会，完成岗位融入反馈"],
+          ["2026-05-18", "关键岗位标记", "被标记为关键岗位人员，纳入重点跟踪名单"],
+          ["2026-06-01", "月度绩效", "月度绩效等级 A，检验记录完整率 98%"],
+          ["2026-06-08", "关键事件", "参与异常样品复核，协助完成复盘记录"]
+        ],
+        records: {
+          "培训记录": { count: 6, rows: [
+            ["品管基础操作培训", "2026-04-08", "已完成", "培训管理员", "复训周期：2026-10"],
+            ["安全规范培训", "2026-03-28", "已完成", "安全环保部", "年度安全培训已归档"],
+            ["检验记录规范", "2026-04-18", "已完成", "品管部", "抽查记录完整率 98%"],
+            ["化验设备点检", "2026-04-26", "已完成", "设备部", "点检流程已通过"],
+            ["质量异常复盘", "2026-05-12", "已完成", "品管经理", "纳入案例库"],
+            ["岗位复训计划", "2026-06-10", "待跟进", "培训管理员", "本月完成复训安排"]
+          ] },
+          "合同记录": { count: 1, rows: [
+            ["三年期劳动合同", "2026-03-20 至 2029-03-19", "生效中", "人事专员", "到期前90天提醒"]
+          ] },
+          "调动记录": { count: 0, rows: [] },
+          "奖惩记录": { count: 1, rows: [
+            ["检验记录完整率表扬", "2026-06-01", "已归档", "部门主管", "用于年度评优参考"]
+          ] },
+          "绩效记录": { count: 3, rows: [
+            ["月度绩效 A", "2026-06", "优秀", "部门主管", "继续纳入关键岗位观察"],
+            ["月度绩效 A-", "2026-05", "良好", "部门主管", "保持培养计划"],
+            ["试用期阶段评价", "2026-04", "通过", "品管经理", "同步转正评估材料"]
+          ] },
+          "认证记录": { count: 2, rows: [
+            ["化验岗位上岗认证", "2026-04-25", "有效", "品管部", "下次复核：2027-03"],
+            ["关键岗位备案", "2026-05-18", "有效", "HRBP", "持续跟踪岗位稳定性"]
+          ] },
+          "关联单据": { count: 18, rows: [
+            ["入职审批单", "2026-03-17", "已归档", "招聘专员", "档案附件完整"],
+            ["合同签署单", "2026-03-20", "已归档", "人事专员", "电子签章已完成"],
+            ["关键岗位标记单", "2026-05-18", "已生效", "HRBP", "纳入重点人员池"]
+          ] },
+          "待办事项": { count: 1, rows: [
+            ["岗位培养计划确认", "本月内", "待跟进", "HRBP", "本月内完成确认"]
+          ] }
+        }
+      },
+      "default": {
+        age: 31,
+        gender: "男",
+        phone: "138****0000",
+        manager: "部门主管",
+        political: "群众",
+        tags: ["岗位员工", "在职档案", "合同用工"],
+        capability: [78, 75, 72, 80, 76],
+        performance: [80, 82, 81, 84, 83, 85],
+        performanceYear: [78, 80, 82, 81, 84, 83, 85, 84, 86, 83, 85, 86],
+        timeline: [],
+        records: {}
+      }
+    };
+
+    function parseDate(dateText) {
+      var parts = dateText.split("-").map(Number);
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    function formatDate(date) {
+      var year = date.getFullYear();
+      var month = String(date.getMonth() + 1).padStart(2, "0");
+      var day = String(date.getDate()).padStart(2, "0");
+      return year + "-" + month + "-" + day;
+    }
+
+    function addDays(dateText, days) {
+      var date = parseDate(dateText);
+      date.setDate(date.getDate() + days);
+      return formatDate(date);
+    }
+
+    function addYears(dateText, years) {
+      var date = parseDate(dateText);
+      date.setFullYear(date.getFullYear() + years);
+      date.setDate(date.getDate() - 1);
+      return formatDate(date);
+    }
+
+    function buildDefaultTimeline(emp) {
+      var hire = emp[6];
+      return [
+        [hire, "员工入职", "入职单据同步至员工档案，生成工号 " + emp[1]],
+        [addDays(hire, 3), "合同签订", "劳动合同记录进入生效状态，附件完成归档"],
+        [addDays(hire, 7), "岗位培训", "同步岗位培训记录、课时和考核结果"],
+        [addDays(hire, 18), "团队活动", "参与部门班组沟通会，完成新人融入反馈"],
+        [addDays(hire, 35), "关键事件", "完成岗位任务闭环，相关记录同步至员工档案"],
+        [addDays(hire, 60), emp[5] === "试用" ? "转正评估" : "月度绩效", "部门主管与 HR 同步月度评估结果至员工档案"],
+        [addDays(hire, 90), "培养跟进", "HRBP 与部门主管确认下一阶段培养或稳定性跟踪计划"]
+      ];
+    }
+
+    function buildDefaultRecords(emp) {
+      var hire = emp[6];
+      return {
+        "培训记录": { count: 6, rows: [
+          ["岗位入职培训", addDays(hire, 7), "已完成", "培训管理员", "关注复训计划"],
+          ["安全生产培训", addDays(hire, 10), "已完成", "安全环保部", "年度复训提醒"],
+          ["岗位实操带教", addDays(hire, 21), "已完成", "部门主管", "同步带教评价"],
+          ["班组作业规范", addDays(hire, 28), "已完成", "班组长", "观察岗位适配"],
+          ["质量意识培训", addDays(hire, 35), "已完成", "品管部", "纳入月度抽查"],
+          ["复训计划确认", addDays(hire, 60), "待跟进", "培训管理员", "确认后续复训周期"]
+        ] },
+        "合同记录": { count: 1, rows: [
+          ["劳动合同", addDays(hire, 3) + " 至 " + addYears(hire, 3), "生效中", "人事专员", "按合同到期规则提醒"]
+        ] },
+        "调动记录": { count: 1, rows: [
+          ["岗位/部门调整记录", addDays(hire, 120), "已归档", "HRBP", "确认档案同步完整"]
+        ] },
+        "奖惩记录": { count: 0, rows: [] },
+        "绩效记录": { count: 6, rows: [
+          ["近6个月绩效", "2026-06", "稳定", "部门主管", "持续观察波动"],
+          ["月度绩效回写", "2026-05", "正常", "部门主管", "作为岗位评价参考"],
+          ["阶段绩效评价", addDays(hire, 60), "通过", "部门主管", "同步员工档案"]
+        ] },
+        "认证记录": { count: 1, rows: [
+          ["岗位技能认证", addDays(hire, 30), "有效", "业务部门", "到期前提前复核"]
+        ] },
+        "关联单据": { count: 9, rows: [
+          ["入职单据", hire, "已归档", "招聘专员", "附件完整"],
+          ["合同单据", addDays(hire, 3), "已归档", "人事专员", "状态正常"],
+          ["培训记录单", addDays(hire, 7), "已归档", "培训管理员", "已同步课时"]
+        ] },
+        "待办事项": { count: 0, rows: [] }
+      };
+    }
+
+    function tagClass(tag) {
+      if (["正式", "在职档案", "优秀员工"].includes(tag)) return "tag-green";
+      if (["试用", "储备人才", "储备干部", "待办事项"].includes(tag)) return "tag-amber";
+      if (["党员", "合同临期"].includes(tag)) return "tag-red";
+      if (["多能工", "关键岗位", "核心人员", "内训师", "岗位师傅", "岗位培养", "品管序列"].includes(tag)) return "tag-purple";
+      if (["合同用工", "本科", "大专", "硕士"].includes(tag)) return "tag-cyan";
+      return "tag-gray";
+    }
+
+    function serviceClass(serviceText) {
+      var years = parseFloat(serviceText) || 0;
+      if (years < 0.5) return "stat-amber";
+      if (years >= 5) return "stat-green";
+      return "stat-blue";
+    }
+
+    function educationClass(edu) {
+      if (edu === "硕士" || edu === "本科") return "stat-purple";
+      if (edu === "大专") return "stat-blue";
+      return "stat-amber";
+    }
+
+    function contractClass(riskText) {
+      if (riskText === "30天内" || riskText === "60天内") return "stat-red";
+      if (riskText === "90天内") return "stat-amber";
+      return "stat-green";
+    }
+
+    function setProfileStatClass(id, className) {
+      var node = document.getElementById(id);
+      if (node && node.parentElement) node.parentElement.className = "profile-stat " + className;
+    }
+
+    function setRiskCardClass(id, className) {
+      var node = document.getElementById(id);
+      if (node && node.parentElement) node.parentElement.className = "archive-risk " + className;
+    }
+
+    function performanceRating(score) {
+      if (score >= 90) return "A";
+      if (score >= 85) return "A-";
+      if (score >= 80) return "B+";
+      if (score >= 75) return "B";
+      return "C";
+    }
+
+    function ratingClass(rating) {
+      if (rating === "A") return "rating-a";
+      if (rating === "A-") return "rating-a-minus";
+      if (rating === "B+") return "rating-b-plus";
+      if (rating === "B") return "rating-b";
+      return "rating-c";
+    }
+
+    function ratingColor(rating) {
+      if (rating === "A") return palette.green;
+      if (rating === "A-") return palette.cyan;
+      if (rating === "B+") return palette.blue;
+      if (rating === "B") return palette.orange;
+      return palette.red;
+    }
+
+    function ratingCounts(scores) {
+      return scores.reduce(function (acc, score) {
+        var rating = performanceRating(score);
+        acc[rating] = (acc[rating] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
+    function cssVar(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function themeConf() {
+      return {
+        text: cssVar("--text-sub"),
+        muted: cssVar("--text-muted"),
+        border: cssVar("--border"),
+        surface: cssVar("--surface")
+      };
+    }
+
+    function baseTooltip() {
+      var c = themeConf();
+      return {
+        backgroundColor: c.surface,
+        borderColor: c.border,
+        textStyle: { color: cssVar("--text") },
+        extraCssText: "box-shadow:0 8px 24px rgba(0,0,0,.12);border-radius:8px;"
+      };
+    }
+
+    function chart(id) {
+      if (charts[id]) charts[id].dispose();
+      charts[id] = echarts.init(document.getElementById(id));
+      return charts[id];
+    }
+
+    function bindChartDrill(chartInstance, prefix) {
+      chartInstance.off("click");
+      chartInstance.on("click", function (params) {
+        var name = params.name || params.seriesName || prefix;
+        drillToDetail(prefix + " - " + name);
+      });
+    }
+
+    function renderTrend() {
+      var source = trendMode === "month" ? trendMonthly : trendQuarter;
+      var c = themeConf();
+      var trendChart = chart("trendChart");
+      trendChart.setOption({
+        color: [palette.blue, palette.red, palette.green],
+        tooltip: Object.assign({ trigger: "axis" }, baseTooltip()),
+        legend: {
+          top: 4,
+          right: 14,
+          textStyle: { color: c.muted },
+          itemWidth: 16,
+          itemHeight: 8
+        },
+        grid: { left: 48, right: 24, top: 48, bottom: 42 },
+        xAxis: {
+          type: "category",
+          boundaryGap: false,
+          data: source.x,
+          axisLine: { lineStyle: { color: c.border } },
+          axisLabel: { color: c.muted }
+        },
+        yAxis: {
+          type: "value",
+          axisLine: { show: false },
+          axisLabel: { color: c.muted },
+          splitLine: { lineStyle: { color: c.border, type: "dashed" } }
+        },
+        series: [
+          areaLine("入职人数", source.hire, palette.blue),
+          areaLine("离职人数", source.leave, palette.red),
+          areaLine("转正人数", source.confirm, palette.green)
+        ]
+      });
+      bindChartDrill(trendChart, "入职/离职/转正趋势");
+    }
+
+    function areaLine(name, data, color) {
+      return {
+        name: name,
+        type: "line",
+        smooth: true,
+        symbol: "circle",
+        symbolSize: 6,
+        data: data,
+        lineStyle: { width: 2, color: color },
+        itemStyle: { color: color },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: color + "26" },
+            { offset: 1, color: color + "00" }
+          ])
+        }
+      };
+    }
+
+    function renderStatus() {
+      var c = themeConf();
+      var statusChart = chart("statusChart");
+      statusChart.setOption({
+        tooltip: Object.assign({ trigger: "item", formatter: "{b}<br>{c} 人 ({d}%)" }, baseTooltip()),
+        legend: { bottom: 0, textStyle: { color: c.muted }, itemWidth: 10, itemHeight: 10 },
+        series: [{
+          type: "pie",
+          radius: ["48%", "72%"],
+          center: ["50%", "44%"],
+          avoidLabelOverlap: true,
+          padAngle: 2,
+          label: { color: c.text, formatter: "{b}\n{d}%" },
+          itemStyle: { borderRadius: 6 },
+          data: statusData
+        }]
+      });
+      bindChartDrill(statusChart, "员工状态分布");
+    }
+
+    function renderDeptMovement() {
+      var c = themeConf();
+      var movementChart = chart("deptMovementChart");
+      var depts = deptMovementData.map(function (d) { return d.dept; }).reverse();
+      movementChart.setOption({
+        tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" } }, baseTooltip()),
+        legend: {
+          top: 0,
+          right: 0,
+          itemWidth: 8,
+          itemHeight: 8,
+          textStyle: { color: c.muted, fontSize: 11 },
+          data: ["入职", "转正", "异动", "离职"]
+        },
+        grid: { left: 82, right: 24, top: 34, bottom: 12 },
+        xAxis: {
+          type: "value",
+          splitLine: { lineStyle: { color: c.border, type: "dashed" } },
+          axisLabel: { color: c.muted },
+          axisLine: { show: false }
+        },
+        yAxis: {
+          type: "category",
+          data: depts,
+          axisLabel: { color: c.text },
+          axisLine: { show: false },
+          axisTick: { show: false }
+        },
+        series: [
+          {
+            name: "入职",
+            type: "bar",
+            stack: "movement",
+            barWidth: 14,
+            itemStyle: { color: palette.blue, borderRadius: [6, 0, 0, 6] },
+            data: deptMovementData.map(function (d) { return d.hire; }).reverse()
+          },
+          {
+            name: "转正",
+            type: "bar",
+            stack: "movement",
+            barWidth: 14,
+            itemStyle: { color: palette.green },
+            data: deptMovementData.map(function (d) { return d.regular; }).reverse()
+          },
+          {
+            name: "异动",
+            type: "bar",
+            stack: "movement",
+            barWidth: 14,
+            itemStyle: { color: palette.purple },
+            data: deptMovementData.map(function (d) { return d.transfer; }).reverse()
+          },
+          {
+            name: "离职",
+            type: "bar",
+            stack: "movement",
+            barWidth: 14,
+            itemStyle: { color: palette.red, borderRadius: [0, 6, 6, 0] },
+            label: {
+              show: true,
+              position: "right",
+              color: c.text,
+              formatter: function (params) {
+                var item = deptMovementData.slice().reverse()[params.dataIndex];
+                return item.hire + item.regular + item.transfer + item.leave;
+              }
+            },
+            data: deptMovementData.map(function (d) { return d.leave; }).reverse()
+          }
+        ]
+      });
+      bindChartDrill(movementChart, "部门入转调离统计");
+    }
+
+    function renderEdu() {
+      var c = themeConf();
+      var eduChart = chart("eduChart");
+      eduChart.setOption({
+        tooltip: Object.assign({ trigger: "item", formatter: "{b}<br>{c} 人 ({d}%)" }, baseTooltip()),
+        legend: { bottom: 0, textStyle: { color: c.muted }, itemWidth: 10, itemHeight: 10 },
+        color: [palette.blue, palette.cyan, palette.orange, palette.purple, palette.gray],
+        series: [{
+          type: "pie",
+          radius: ["42%", "70%"],
+          center: ["50%", "44%"],
+          padAngle: 2,
+          itemStyle: { borderRadius: 6 },
+          label: { color: c.text, formatter: "{b}\n{d}%" },
+          data: eduData
+        }]
+      });
+      bindChartDrill(eduChart, "学历结构");
+    }
+
+    function renderDept() {
+      var c = themeConf();
+      var data = deptData.slice().reverse();
+      var deptChart = chart("deptChart");
+      deptChart.setOption({
+        tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" } }, baseTooltip()),
+        grid: { left: 82, right: 34, top: 18, bottom: 24 },
+        xAxis: {
+          type: "value",
+          splitLine: { lineStyle: { color: c.border, type: "dashed" } },
+          axisLabel: { color: c.muted }
+        },
+        yAxis: {
+          type: "category",
+          data: data.map(function (d) { return d[0]; }),
+          axisLabel: { color: c.text },
+          axisLine: { lineStyle: { color: c.border } }
+        },
+        series: [{
+          type: "bar",
+          barWidth: 14,
+          data: data.map(function (d, i) {
+            return { value: d[1], itemStyle: { color: [palette.blue, palette.cyan, palette.purple, palette.orange, palette.green, palette.amber, palette.red, palette.gray][i], borderRadius: [0, 6, 6, 0] } };
+          }),
+          label: { show: true, position: "right", color: c.text, formatter: "{c}" }
+        }]
+      });
+      bindChartDrill(deptChart, "部门人员排行");
+    }
+
+    function renderAgeChart() {
+      var c = themeConf();
+      var ageChart = chart("ageChart");
+      ageChart.setOption({
+        tooltip: Object.assign({ trigger: "axis" }, baseTooltip()),
+        grid: { left: 44, right: 20, top: 22, bottom: 34 },
+        xAxis: {
+          type: "category",
+          data: ["20-25", "26-30", "31-35", "36-40", "41-45", "46-50", "50+"],
+          axisLine: { lineStyle: { color: c.border } },
+          axisLabel: { color: c.muted }
+        },
+        yAxis: {
+          type: "value",
+          axisLine: { show: false },
+          axisLabel: { color: c.muted },
+          splitLine: { lineStyle: { color: c.border, type: "dashed" } }
+        },
+        series: [{
+          name: "年龄分布",
+          type: "bar",
+          barWidth: 28,
+          data: [182, 365, 336, 276, 179, 91, 57],
+          itemStyle: { color: palette.blue, borderRadius: [6, 6, 0, 0] },
+          label: { show: true, position: "top", color: c.text, formatter: "{c}" }
+        }]
+      });
+      bindChartDrill(ageChart, "年龄结构");
+    }
+
+    function renderServiceChart() {
+      var c = themeConf();
+      var serviceChart = chart("serviceChart");
+      var serviceData = [
+        { name: "1年以下", value: 13, itemStyle: { color: palette.cyan } },
+        { name: "1-3年", value: 42, itemStyle: { color: palette.amber } },
+        { name: "3-5年", value: 31, itemStyle: { color: palette.purple } },
+        { name: "5-10年", value: 57, itemStyle: { color: palette.blue } },
+        { name: "10年以上", value: 221, itemStyle: { color: "#7c5849" } }
+      ];
+      var serviceTotal = serviceData.reduce(function (sum, item) {
+        return sum + item.value;
+      }, 0);
+      serviceChart.setOption({
+        tooltip: Object.assign({ trigger: "item", formatter: "{b}<br>{c} 人 ({d}%)" }, baseTooltip()),
+        title: {
+          text: serviceTotal.toLocaleString() + "人",
+          subtext: "合计",
+          left: "49.5%",
+          top: "37%",
+          textAlign: "center",
+          textStyle: {
+            color: c.text,
+            fontSize: 20,
+            fontWeight: 760,
+            lineHeight: 24
+          },
+          subtextStyle: {
+            color: c.muted,
+            fontSize: 12,
+            fontWeight: 500,
+            lineHeight: 18
+          }
+        },
+        legend: {
+          bottom: 0,
+          textStyle: { color: c.muted },
+          itemWidth: 10,
+          itemHeight: 10
+        },
+        series: [{
+          name: "司龄结构",
+          type: "pie",
+          radius: ["42%", "66%"],
+          center: ["50%", "43%"],
+          avoidLabelOverlap: true,
+          minAngle: 4,
+          label: {
+            color: c.text,
+            formatter: function (p) {
+              return p.name + " " + p.value + "人";
+            }
+          },
+          labelLine: {
+            length: 16,
+            length2: 10,
+            lineStyle: { color: c.muted }
+          },
+          itemStyle: { borderRadius: 5 },
+          data: serviceData
+        }]
+      });
+      bindChartDrill(serviceChart, "司龄结构");
+    }
+
+    function renderTag() {
+      var c = themeConf();
+      var data = tagData.slice().reverse();
+      var tagChart = chart("tagChart");
+      tagChart.setOption({
+        tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" } }, baseTooltip()),
+        grid: { left: 86, right: 34, top: 18, bottom: 24 },
+        xAxis: {
+          type: "value",
+          splitLine: { lineStyle: { color: c.border, type: "dashed" } },
+          axisLabel: { color: c.muted }
+        },
+        yAxis: {
+          type: "category",
+          data: data.map(function (d) { return d[0]; }),
+          axisLine: { lineStyle: { color: c.border } },
+          axisLabel: { color: c.text }
+        },
+        series: [{
+          type: "bar",
+          barWidth: 14,
+          data: data.map(function (d, i) {
+            return { value: d[1], itemStyle: { color: [palette.purple, palette.blue, palette.cyan, palette.green, palette.orange, palette.amber, palette.red, palette.gray][i], borderRadius: [0, 6, 6, 0] } };
+          }),
+          label: { show: true, position: "right", color: c.text, formatter: "{c}" }
+        }]
+      });
+      bindChartDrill(tagChart, "关键标签人员统计");
+    }
+
+    function renderTable() {
+      var tbody = document.getElementById("employeeRows");
+      tbody.innerHTML = employees.map(function (e) {
+        var statusClass = e[5] === "正式" ? "formal" : e[5] === "试用" ? "trial" : "leave";
+        var riskClass = e[10] === "30天内" || e[10] === "60天内" ? "risk" : e[10] === "90天内" ? "trial" : "blue";
+        return "<tr>" +
+          "<td><span class='employee drill-link' role='button' tabindex='0' onclick=\"openEmployeeArchive('" + e[1] + "')\" onkeydown=\"handleEmployeeKey(event, '" + e[1] + "')\"><span class='avatar'>" + e[0].slice(0, 1) + "</span>" + e[0] + "</span></td>" +
+          "<td>" + e[1] + "</td>" +
+          "<td>" + e[2] + "</td>" +
+          "<td>" + e[3] + "</td>" +
+          "<td>" + e[4] + "</td>" +
+          "<td><span class='tag " + statusClass + "'>" + e[5] + "</span></td>" +
+          "<td>" + e[6] + "</td>" +
+          "<td>" + e[7] + "</td>" +
+          "<td>" + e[8] + "</td>" +
+          "<td><span class='tag blue'>" + e[9] + "</span></td>" +
+          "<td><span class='tag " + riskClass + "'>" + e[10] + "</span></td>" +
+        "</tr>";
+      }).join("");
+    }
+
+    function handleEmployeeKey(event, empId) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openEmployeeArchive(empId);
+      }
+    }
+
+    function openEmployeeArchive(empId) {
+      var emp = employees.find(function (item) { return item[1] === empId; }) || employees[0];
+      var specificProfile = archiveProfiles[empId] || null;
+      var profile = Object.assign({}, archiveProfiles.default, archiveProfiles[empId] || {});
+      document.getElementById("drawerAvatar").textContent = emp[0].slice(0, 1);
+      document.getElementById("drawerName").textContent = emp[0];
+      document.getElementById("drawerSub").textContent = emp[1] + " · " + emp[2] + " · " + emp[3] + " · " + emp[4] + " · " + profile.manager;
+      document.getElementById("drawerStatus").className = "tag " + (emp[5] === "正式" ? "formal" : emp[5] === "试用" ? "trial" : "leave");
+      document.getElementById("drawerStatus").textContent = emp[5];
+      document.getElementById("archiveHireDate").textContent = emp[6];
+      document.getElementById("archiveService").textContent = emp[8];
+      document.getElementById("archiveEdu").textContent = emp[7];
+      document.getElementById("archiveRisk").textContent = emp[10];
+      document.getElementById("archiveManager").textContent = profile.manager;
+      document.getElementById("archivePhone").textContent = profile.phone;
+      document.getElementById("archiveContractRisk").textContent = emp[10] === "30天内" ? "合同临期高风险" : emp[10] === "60天内" || emp[10] === "90天内" ? "合同需跟进" : "合同正常";
+      document.getElementById("archiveTrialRisk").textContent = emp[5] === "试用" ? "转正待评估" : "转正状态正常";
+      document.getElementById("archiveCertRisk").textContent = emp[9] === "多能工" ? "技能认证需维护" : "认证有效";
+      setProfileStatClass("archiveHireDate", "stat-blue");
+      setProfileStatClass("archiveService", serviceClass(emp[8]));
+      setProfileStatClass("archiveEdu", educationClass(emp[7]));
+      setProfileStatClass("archiveRisk", contractClass(emp[10]));
+      setProfileStatClass("archiveManager", "stat-purple");
+      setProfileStatClass("archivePhone", "stat-blue");
+      setRiskCardClass("archiveContractRisk", emp[10] === "30天内" || emp[10] === "60天内" ? "risk-red" : emp[10] === "90天内" ? "risk-amber" : "risk-green");
+      setRiskCardClass("archiveTrialRisk", emp[5] === "试用" ? "risk-amber" : "risk-green");
+      setRiskCardClass("archiveCertRisk", emp[9] === "多能工" ? "risk-amber" : "risk-blue");
+
+      var tags = [emp[9], emp[5], emp[7], profile.political, profile.gender, profile.age + "岁"].concat(profile.tags || []);
+      document.getElementById("archiveTags").innerHTML = Array.from(new Set(tags)).map(function (tag) {
+        return "<span class='archive-tag " + tagClass(tag) + "'>" + tag + "</span>";
+      }).join("");
+
+      var timeline = specificProfile && specificProfile.timeline && specificProfile.timeline.length ? profile.timeline : buildDefaultTimeline(emp);
+      document.getElementById("archiveTimeline").innerHTML = timeline.map(function (item, index) {
+        var latestClass = index === timeline.length - 1 ? " latest" : "";
+        return "<div class='timeline-item" + latestClass + "'><div class='timeline-date'>" + item[0] + "</div><div class='timeline-card'><b>" + item[1] + "</b><span>" + item[2] + "</span></div></div>";
+      }).join("");
+
+      currentArchiveProfile = Object.assign({}, profile, {
+        records: specificProfile && specificProfile.records ? profile.records : buildDefaultRecords(emp)
+      });
+      activeArchiveRecordType = "培训记录";
+      activeArchiveRecordPage = 1;
+      renderArchiveRecords();
+
+      document.getElementById("drawerMask").classList.add("show");
+      document.body.classList.add("archive-open");
+      var drawer = document.getElementById("employeeDrawer");
+      drawer.classList.add("show");
+      drawer.setAttribute("aria-hidden", "false");
+      renderArchiveCharts(profile);
+      window.setTimeout(scrollArchiveTimelineLatest, 60);
+    }
+
+    function scrollArchiveTimeline(direction) {
+      var scroller = document.getElementById("timelineScroll");
+      if (!scroller) return;
+      scroller.scrollBy({ left: direction * 250, behavior: "smooth" });
+    }
+
+    function scrollArchiveTimelineLatest() {
+      var scroller = document.getElementById("timelineScroll");
+      if (!scroller) return;
+      scroller.scrollLeft = scroller.scrollWidth;
+    }
+
+    function archiveStatusClass(status) {
+      if (status === "待跟进") return "trial";
+      if (status === "异常" || status === "临期") return "risk";
+      if (status === "优秀" || status === "已归档" || status === "通过") return "formal";
+      return "blue";
+    }
+
+    function selectArchiveRecordTab(type) {
+      activeArchiveRecordType = type;
+      activeArchiveRecordPage = 1;
+      renderArchiveRecords();
+    }
+
+    function changeArchiveRecordPage(page) {
+      activeArchiveRecordPage = page;
+      renderArchiveRecords();
+    }
+
+    function renderArchiveRecords() {
+      if (!currentArchiveProfile) return;
+      var records = currentArchiveProfile.records || {};
+      var active = records[activeArchiveRecordType] || { count: 0, rows: [] };
+      var rows = active.rows || [];
+      var totalPages = Math.max(1, Math.ceil(rows.length / archiveRecordPageSize));
+      activeArchiveRecordPage = Math.min(Math.max(activeArchiveRecordPage, 1), totalPages);
+      var startIndex = (activeArchiveRecordPage - 1) * archiveRecordPageSize;
+      var pageRows = rows.slice(startIndex, startIndex + archiveRecordPageSize);
+      var metrics = archiveRecordTypes.map(function (type) {
+        var item = records[type] || { count: 0, rows: [] };
+        var cls = type === activeArchiveRecordType ? "archive-record-metric active" : "archive-record-metric";
+        return "<button class='" + cls + "' onclick=\"selectArchiveRecordTab('" + type + "')\">" +
+          "<strong>" + item.count + "</strong><span>" + type + "</span>" +
+        "</button>";
+      }).join("");
+      var tabs = archiveRecordTypes.map(function (type) {
+        var item = records[type] || { count: 0, rows: [] };
+        var cls = type === activeArchiveRecordType ? "archive-record-tab active" : "archive-record-tab";
+        return "<button class='" + cls + "' onclick=\"selectArchiveRecordTab('" + type + "')\">" + type + " " + item.count + "</button>";
+      }).join("");
+      var body = rows.length
+        ? "<table class='archive-record-table'>" +
+            "<thead><tr><th>记录名称</th><th>时间/周期</th><th>状态</th><th>负责人</th><th>HR动作</th></tr></thead>" +
+            "<tbody>" + pageRows.map(function (row) {
+              return "<tr class='drill-link' onclick=\"drillToDetail('员工档案记录 - " + activeArchiveRecordType + " - " + row[0] + "')\">" +
+                "<td><span class='archive-record-title'>" + row[0] + "</span></td>" +
+                "<td>" + row[1] + "</td>" +
+                "<td><span class='tag " + archiveStatusClass(row[2]) + "'>" + row[2] + "</span></td>" +
+                "<td>" + row[3] + "</td>" +
+                "<td>" + row[4] + "</td>" +
+              "</tr>";
+            }).join("") + "</tbody>" +
+          "</table>" +
+          "<div class='archive-record-pager'>" +
+            "<span>共 " + rows.length + " 条，第 " + activeArchiveRecordPage + " / " + totalPages + " 页</span>" +
+            "<button onclick='changeArchiveRecordPage(" + (activeArchiveRecordPage - 1) + ")' " + (activeArchiveRecordPage === 1 ? "disabled" : "") + ">‹</button>" +
+            "<button onclick='changeArchiveRecordPage(" + (activeArchiveRecordPage + 1) + ")' " + (activeArchiveRecordPage === totalPages ? "disabled" : "") + ">›</button>" +
+          "</div>"
+        : "<div class='empty-record'>当前员工暂无" + activeArchiveRecordType + "明细</div>";
+      document.getElementById("archiveRecords").innerHTML =
+        "<div class='archive-record-metrics'>" + metrics + "</div>" +
+        "<div class='archive-record-tabs'>" + tabs + "</div>" +
+        body;
+    }
+
+    function closeEmployeeArchive() {
+      document.getElementById("drawerMask").classList.remove("show");
+      document.body.classList.remove("archive-open");
+      var drawer = document.getElementById("employeeDrawer");
+      drawer.classList.remove("show");
+      drawer.setAttribute("aria-hidden", "true");
+    }
+
+    function renderArchiveCharts(profile) {
+      var c = themeConf();
+      var performanceYear = profile.performanceYear || profile.performance || [];
+      var latestScore = performanceYear[performanceYear.length - 1] || 0;
+      var latestRating = performanceRating(latestScore);
+      var avgScore = performanceYear.length ? Math.round(performanceYear.reduce(function (sum, score) { return sum + score; }, 0) / performanceYear.length) : 0;
+      var counts = ratingCounts(performanceYear);
+      var radar = chart("archiveRadarChart");
+      radar.setOption({
+        tooltip: baseTooltip(),
+        radar: {
+          radius: "62%",
+          indicator: [
+            { name: "岗位技能", max: 100 },
+            { name: "培训完成", max: 100 },
+            { name: "绩效稳定", max: 100 },
+            { name: "合规记录", max: 100 },
+            { name: "发展潜力", max: 100 }
+          ],
+          axisName: { color: c.muted, fontSize: 11 },
+          splitLine: { lineStyle: { color: c.border } },
+          splitArea: { areaStyle: { color: ["transparent", "rgba(22,93,255,.04)"] } },
+          axisLine: { lineStyle: { color: c.border } }
+        },
+        series: [{
+          type: "radar",
+          data: [{ value: profile.capability, name: "能力画像" }],
+          areaStyle: { color: "rgba(22,93,255,.18)" },
+          lineStyle: { color: palette.blue, width: 2 },
+          itemStyle: { color: palette.blue }
+        }]
+      });
+
+      document.getElementById("archivePerfSummary").innerHTML =
+        "<div class='perf-stat " + ratingClass(latestRating) + "'><span>最近一次得分</span><strong>" + latestScore + "</strong></div>" +
+        "<div class='perf-stat " + ratingClass(latestRating) + "'><span>最近一次评级</span><strong>" + latestRating + "</strong></div>" +
+        "<div class='perf-stat " + ratingClass(performanceRating(avgScore)) + "'><span>年度平均分</span><strong>" + avgScore + "</strong></div>";
+      document.getElementById("archiveRatingCounts").innerHTML = ["A", "A-", "B+", "B", "C"].map(function (rating) {
+        return "<span class='rating-pill " + ratingClass(rating) + "'>" + rating + " " + (counts[rating] || 0) + "次</span>";
+      }).join("");
+
+      var perf = chart("archivePerfChart");
+      perf.setOption({
+        tooltip: Object.assign({ trigger: "axis" }, baseTooltip()),
+        grid: { left: 34, right: 16, top: 14, bottom: 26 },
+        xAxis: {
+          type: "category",
+          data: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
+          axisLine: { lineStyle: { color: c.border } },
+          axisLabel: { color: c.muted, fontSize: 11 }
+        },
+        yAxis: {
+          type: "value",
+          min: 60,
+          max: 100,
+          axisLine: { show: false },
+          axisLabel: { color: c.muted, fontSize: 11 },
+          splitLine: { lineStyle: { color: c.border, type: "dashed" } }
+        },
+        series: [{
+          name: "绩效得分",
+          type: "line",
+          smooth: true,
+          symbolSize: 6,
+          data: performanceYear.map(function (score) {
+            var rating = performanceRating(score);
+            return {
+              value: score,
+              itemStyle: { color: ratingColor(rating), borderColor: "#fff", borderWidth: 1 },
+              label: { color: ratingColor(rating) }
+            };
+          }),
+          lineStyle: { color: palette.green, width: 2 },
+          itemStyle: { color: palette.green },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "rgba(0,180,42,.18)" },
+              { offset: 1, color: "rgba(0,180,42,0)" }
+            ])
+          }
+        }]
+      });
+    }
+
+    function handleDrillKey(event, label) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        drillToDetail(label);
+      }
+    }
+
+    function drillToDetail(label) {
+      var hint = document.getElementById("drillHint");
+      var table = document.querySelector(".table-card");
+      if (hint) {
+        hint.textContent = "当前下钻：" + label + "，已定位至员工档案明细";
+        hint.classList.add("show");
+      }
+      if (table) {
+        table.scrollIntoView({ behavior: "smooth", block: "start" });
+        table.style.boxShadow = "0 0 0 3px var(--primary-soft), var(--shadow)";
+        window.setTimeout(function () {
+          table.style.boxShadow = "var(--shadow)";
+        }, 1200);
+      }
+    }
+
+    function defaultDashboardOrder() {
+      return [
+        "kpi-active", "kpi-trial", "kpi-hire", "kpi-turnover", "kpi-age", "kpi-contract",
+        "identity-party", "identity-veteran", "identity-union", "identity-representative",
+        "trend-flow", "risk-reminder",
+        "status-structure", "dept-movement", "edu-structure",
+        "dept-rank", "gender-structure", "service-structure",
+        "age-structure", "tag-stat", "detail-table"
+      ];
+    }
+
+    function dashboardModules() {
+      return Array.prototype.slice.call(document.querySelectorAll("#dashboardCanvas [data-dashboard-module]"));
+    }
+
+    function prepareDashboardCard(card, config) {
+      if (!card) return;
+      card.dataset.dashboardModule = config.id;
+      card.dataset.moduleTitle = config.title;
+      card.dataset.moduleSize = config.size;
+      card.classList.add("dashboard-card-item");
+    }
+
+    function initializeDashboardCanvas() {
+      if (document.getElementById("dashboardCanvas")) return;
+      var editHint = document.getElementById("editHint");
+      var canvas = document.createElement("section");
+      canvas.id = "dashboardCanvas";
+      canvas.className = "dashboard-canvas";
+      editHint.parentNode.insertBefore(canvas, editHint.nextSibling);
+
+      var kpiCards = Array.prototype.slice.call(document.querySelectorAll(".kpi-grid > article"));
+      [
+        ["kpi-active", "在职员工总数"],
+        ["kpi-trial", "试用期员工"],
+        ["kpi-hire", "新入职"],
+        ["kpi-turnover", "离职率"],
+        ["kpi-age", "平均年龄"],
+        ["kpi-contract", "合同到期"]
+      ].forEach(function (item, index) {
+        prepareDashboardCard(kpiCards[index], { id: item[0], title: item[1], size: "kpi" });
+        if (kpiCards[index]) canvas.appendChild(kpiCards[index]);
+      });
+
+      var identityCards = Array.prototype.slice.call(document.querySelectorAll(".identity-grid > article"));
+      [
+        ["identity-party", "党员人数"],
+        ["identity-veteran", "退伍军人人数"],
+        ["identity-union", "工会委员人数"],
+        ["identity-representative", "职工代表人数"]
+      ].forEach(function (item, index) {
+        prepareDashboardCard(identityCards[index], { id: item[0], title: item[1], size: "identity" });
+        if (identityCards[index]) canvas.appendChild(identityCards[index]);
+      });
+
+      var mainCards = Array.prototype.slice.call(document.querySelectorAll(".main-grid > article"));
+      prepareDashboardCard(mainCards[0], { id: "trend-flow", title: "入职/离职/转正趋势", size: "wide" });
+      prepareDashboardCard(mainCards[1], { id: "risk-reminder", title: "人事风险提醒", size: "side" });
+      mainCards.forEach(function (card) { if (card) canvas.appendChild(card); });
+
+      var subGrids = document.querySelectorAll(".sub-grid");
+      var structureOneCards = subGrids[0] ? Array.prototype.filter.call(subGrids[0].children, function (child) { return child.tagName === "ARTICLE"; }) : [];
+      [
+        ["status-structure", "员工状态分布"],
+        ["dept-movement", "部门入转调离统计"],
+        ["edu-structure", "学历结构"]
+      ].forEach(function (item, index) {
+        prepareDashboardCard(structureOneCards[index], { id: item[0], title: item[1], size: "normal" });
+        if (structureOneCards[index]) canvas.appendChild(structureOneCards[index]);
+      });
+
+      var structureTwoCards = subGrids[1] ? Array.prototype.filter.call(subGrids[1].children, function (child) { return child.tagName === "ARTICLE"; }) : [];
+      [
+        ["dept-rank", "部门人员排行"],
+        ["gender-structure", "性别结构"],
+        ["service-structure", "司龄结构"]
+      ].forEach(function (item, index) {
+        prepareDashboardCard(structureTwoCards[index], { id: item[0], title: item[1], size: "normal" });
+        if (structureTwoCards[index]) canvas.appendChild(structureTwoCards[index]);
+      });
+
+      var halfCards = Array.prototype.slice.call(document.querySelectorAll(".sub-grid-2 > article"));
+      [
+        ["age-structure", "年龄结构"],
+        ["tag-stat", "关键标签人员统计"]
+      ].forEach(function (item, index) {
+        prepareDashboardCard(halfCards[index], { id: item[0], title: item[1], size: "half" });
+        if (halfCards[index]) canvas.appendChild(halfCards[index]);
+      });
+
+      var tableCard = document.querySelector(".table-card");
+      prepareDashboardCard(tableCard, { id: "detail-table", title: "员工明细", size: "full" });
+      if (tableCard) canvas.appendChild(tableCard);
+
+      Array.prototype.slice.call(document.querySelectorAll(".kpi-grid, .identity-grid, .main-grid, .sub-grid, .sub-grid-2")).forEach(function (section) {
+        if (!section.children.length) section.remove();
+      });
+    }
+
+    function resizeChartsLater() {
+      window.setTimeout(function () {
+        Object.keys(charts).forEach(function (id) {
+          if (charts[id]) {
+            charts[id].resize();
+          }
+        });
+      }, 80);
+    }
+
+    function ensureModuleHandles() {
+      dashboardModules().forEach(function (module) {
+        if (!module.querySelector(".module-drag-handle")) {
+          var handle = document.createElement("div");
+          handle.className = "module-drag-handle";
+          handle.textContent = "↕ " + (module.dataset.moduleTitle || "看板模块");
+          module.insertBefore(handle, module.firstChild);
+        }
+      });
+    }
+
+    function applyDashboardOrder(order) {
+      var canvas = document.getElementById("dashboardCanvas");
+      var modulesById = {};
+      dashboardModules().forEach(function (module) {
+        modulesById[module.dataset.dashboardModule] = module;
+      });
+
+      order.forEach(function (id) {
+        if (modulesById[id]) {
+          canvas.appendChild(modulesById[id]);
+        }
+      });
+
+      defaultDashboardOrder().forEach(function (id) {
+        if (modulesById[id] && order.indexOf(id) === -1) {
+          canvas.appendChild(modulesById[id]);
+        }
+      });
+      resizeChartsLater();
+    }
+
+    function enterDashboardEdit() {
+      dashboardEditing = true;
+      dashboardSavedOrder = dashboardModules().map(function (module) {
+        return module.dataset.dashboardModule;
+      });
+      ensureModuleHandles();
+      dashboardModules().forEach(function (module) {
+        module.setAttribute("draggable", "true");
+      });
+      document.body.classList.add("dashboard-editing");
+    }
+
+    function exitDashboardEdit() {
+      dashboardEditing = false;
+      dashboardDragSource = null;
+      dashboardModules().forEach(function (module) {
+        module.removeAttribute("draggable");
+        module.classList.remove("dragging", "drag-over");
+      });
+      document.body.classList.remove("dashboard-editing");
+    }
+
+    function saveDashboardLayout() {
+      var order = dashboardModules().map(function (module) {
+        return module.dataset.dashboardModule;
+      });
+      try {
+        localStorage.setItem(dashboardLayoutKey, JSON.stringify(order));
+      } catch (error) {
+        document.getElementById("syncText").textContent = "布局已调整，当前浏览器未开放本地保存";
+      }
+      exitDashboardEdit();
+      resizeChartsLater();
+    }
+
+    function cancelDashboardEdit() {
+      if (dashboardSavedOrder) {
+        applyDashboardOrder(dashboardSavedOrder);
+      }
+      exitDashboardEdit();
+    }
+
+    function resetDashboardLayout() {
+      try {
+        localStorage.removeItem(dashboardLayoutKey);
+      } catch (error) {}
+      applyDashboardOrder(defaultDashboardOrder());
+      resizeChartsLater();
+    }
+
+    function loadDashboardLayout() {
+      try {
+        var saved = JSON.parse(localStorage.getItem(dashboardLayoutKey) || "null");
+        if (Array.isArray(saved)) {
+          applyDashboardOrder(saved);
+        }
+      } catch (error) {
+        try {
+          localStorage.removeItem(dashboardLayoutKey);
+        } catch (removeError) {}
+      }
+    }
+
+    function bindDashboardDrag() {
+      dashboardModules().forEach(function (module) {
+        module.addEventListener("dragstart", function (event) {
+          if (!dashboardEditing) {
+            event.preventDefault();
+            return;
+          }
+          dashboardDragSource = module;
+          module.classList.add("dragging");
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", module.dataset.dashboardModule);
+        });
+
+        module.addEventListener("dragover", function (event) {
+          if (!dashboardEditing || !dashboardDragSource || dashboardDragSource === module) {
+            return;
+          }
+          event.preventDefault();
+          module.classList.add("drag-over");
+        });
+
+        module.addEventListener("dragleave", function () {
+          module.classList.remove("drag-over");
+        });
+
+        module.addEventListener("drop", function (event) {
+          if (!dashboardEditing || !dashboardDragSource || dashboardDragSource === module) {
+            return;
+          }
+          event.preventDefault();
+          module.classList.remove("drag-over");
+
+          var canvas = document.getElementById("dashboardCanvas");
+          var modules = dashboardModules();
+          var sourceIndex = modules.indexOf(dashboardDragSource);
+          var targetIndex = modules.indexOf(module);
+
+          if (sourceIndex < targetIndex) {
+            canvas.insertBefore(dashboardDragSource, module.nextSibling);
+          } else {
+            canvas.insertBefore(dashboardDragSource, module);
+          }
+          resizeChartsLater();
+        });
+
+        module.addEventListener("dragend", function () {
+          module.classList.remove("dragging");
+          dashboardModules().forEach(function (item) {
+            item.classList.remove("drag-over");
+          });
+          dashboardDragSource = null;
+        });
+      });
+    }
+
+    function renderAll() {
+      renderTrend();
+      renderStatus();
+      renderDeptMovement();
+      renderEdu();
+      renderDept();
+      renderAgeChart();
+      renderServiceChart();
+      renderTag();
+      renderTable();
+    }
+
+    function switchTrend(mode, btn) {
+      trendMode = mode;
+      Array.prototype.forEach.call(btn.parentNode.querySelectorAll("button"), function (item) {
+        item.classList.remove("active");
+      });
+      btn.classList.add("active");
+      renderTrend();
+    }
+
+    function toggleTheme() {
+      dark = !dark;
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "");
+      renderAll();
+    }
+
+    function applyFilters() {
+      document.getElementById("syncText").textContent = "筛选完成 2026-06-13 09:30";
+      renderAll();
+    }
+
+    function resetFilters() {
+      ["orgFilter", "deptFilter", "statusFilter", "eduFilter"].forEach(function (id) {
+        document.getElementById(id).value = "all";
+      });
+      document.getElementById("monthFilter").value = "2026-06";
+      document.getElementById("keywordFilter").value = "";
+      document.getElementById("syncText").textContent = "数据更新 2026-06-13 09:30";
+      renderAll();
+    }
+
+    function refreshDashboard() {
+      document.getElementById("syncText").textContent = "刚刚刷新 2026-06-13 09:30";
+      renderAll();
+    }
+
+    function exportNotice() {
+      alert("演示版看板：正式接入后可按筛选条件导出员工档案明细。");
+    }
+
+    window.addEventListener("resize", function () {
+      Object.keys(charts).forEach(function (id) {
+        charts[id] && charts[id].resize();
+      });
+    });
+
+    window.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        closeEmployeeArchive();
+      }
+    });
+
+    initializeDashboardCanvas();
+    ensureModuleHandles();
+    bindDashboardDrag();
+    loadDashboardLayout();
+    renderAll();
+  </script>
+</body>
+</html>
